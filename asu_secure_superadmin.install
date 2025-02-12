@@ -1,0 +1,44 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the asu_secure_superadmin module.
+ */
+
+/**
+ * Implements hook_requirements().
+ *
+ * @throws \JsonException
+ */
+function asu_secure_superadmin_requirements($phase) :array {
+  $requirements = [];
+  $patchName = 'user-module-3135592-2241mr-c39.patch';
+  $requiredPatch = 'upstream-configuration/patches/' . $patchName;
+  $upstreamPatches = 'upstream-configuration/patches.webspark.json';
+
+  if ($phase === 'install') {
+    // Check if a specific patch is applied.
+    $patchFileExists = file_exists(dirname(DRUPAL_ROOT) . '/' . $requiredPatch);
+    $websparkPatches = json_decode(file_get_contents(dirname(DRUPAL_ROOT) . '/' . $upstreamPatches), TRUE, 512, JSON_THROW_ON_ERROR);
+    if (!$patchFileExists && $websparkPatches["drupal/core"]["#3135592: Cannot implement a custom user cancellation method"] !== $requiredPatch) {
+      $requirements['asu_secure_superadmin_patch_test'] = [
+        'description' => t('The Secure User One module requires the @patch_name. Your site does not have this patch installed.', ['@patch_name' => $patchName]),
+        'severity' => REQUIREMENT_ERROR,
+      ];
+    }
+  }
+
+  return $requirements;
+}
+
+function asu_secure_superadmin_install() {
+  try {
+    \Drupal::service('asu_secure_superadmin.change_super_admin_service')->changeSuperAdmin();
+  }
+  catch (\Exception $e) {
+    \Drupal::logger('asu_secure_superadmin')->error($e->getMessage());
+    \Drupal::messenger()->addError($e->getMessage());
+    return;
+  }
+  \Drupal::messenger()->addMessage('The super admin has been changed.');
+}
