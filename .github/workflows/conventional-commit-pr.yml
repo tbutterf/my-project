@@ -14,9 +14,9 @@ on:
 
 jobs:
   conventional-commit-pr:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     permissions:
-      pull_request: write
+      pull_requests: write
       contents: read
     steps:
       - name: Conventional Commit In Pull Requests
