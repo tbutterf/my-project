@@ -20,7 +20,7 @@
 - [ ] This merge request does not introduce new JS errors
 - [ ] This merge request does not introduce new A11y violations
 - [ ] This merge request includes relevant documentation
-- [ ] Included `.yaml` files have a matching update hook
+- [ ] Included .yaml files have a matching update hook
 
 ### Verified in browsers
 
