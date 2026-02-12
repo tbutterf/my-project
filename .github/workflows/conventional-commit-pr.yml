@@ -2,6 +2,7 @@ name: 'Conventional Commit PR'
 
 on:
   pull_request:
+    types: [opened, edited, synchronize, reopened]
     # Sync on pushes to the main branch.
     branches:
       - main
