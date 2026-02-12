@@ -14,3 +14,8 @@ jobs:
       - name: Conventional Commit In Pull Requests
         id: pr-conventional-commits
         uses: ytanikin/pr-conventional-commits@1.5.1
+        with:
+          task_types: '["feat", "fix", "chore"]'
+          add_label: true
+          add_scope_label: false
+          token: ${{ secrets.GITHUB_TOKEN }}
