@@ -93,9 +93,45 @@ jobs:
             ${{ steps.pr-conventional-commits.outputs.error_message }}
             ```
 
+      - name: Inject Jira Ticket into PR Title
+        if: always() && steps.pr-conventional-commits.outputs.scope == 'webspark'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+          
+          # 1. Extract the ticket from the template format: [JIRA ticket](PROJECT-123)
+          # This looks for the content inside the parentheses following "[JIRA ticket]"
+          TICKET=$(echo "$PR_BODY" | grep -oP '\[JIRA ticket\]\(\K[A-Z]+-[0-9]+' || true)
+          
+          if [[ -z "$TICKET" ]]; then
+            echo "::error::No Jira ticket found in the expected format: [JIRA ticket](PROJECT-123)"
+            exit 1
+          fi
+          
+          # 2. Check if the title already has the ticket to prevent infinite loops
+          if [[ "$PR_TITLE" != *"$TICKET"* ]]; then
+            # This sed command captures:
+            # \1: type (feat/fix/etc)
+            # \2: scope (webspark)
+            # \3: the rest of the original subject
+            # It replaces it with: type(webspark): [TICKET] subject
+            NEW_TITLE=$(echo "$PR_TITLE" | sed -E "s/^([a-z]+)\((webspark)\): (.+)$/\1(\2): [$TICKET] \3/")
+          
+            echo "Renaming PR to: $NEW_TITLE"
+            gh pr edit ${{ github.event.pull_request.number }} --title "$NEW_TITLE"
+          else
+            echo "Ticket $TICKET is already in the title."
+          fi
+
       - name: Delete resolved PR title lint error comment
-        if: always() && ${{ steps.pr-conventional-commits.outputs.error_message == null }}
+        # We add 'always()' and check if either the linter passed
+        # OR if we just fixed the title in the previous step.
+        if: always()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: pr-title-lint-error
-          delete: true
+          # If the linter currently sees no errors, delete the old comment
+          delete: ${{ steps.pr-conventional-commits.outputs.error_message == null }}
