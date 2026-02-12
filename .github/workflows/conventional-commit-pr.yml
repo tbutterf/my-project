@@ -100,25 +100,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_BODY="${{ github.event.pull_request.body }}"
           
-          # 1. Extract the ticket from the template format: [JIRA ticket](PROJECT-123)
-          # This looks for the content inside the parentheses following "[JIRA ticket]"
-          TICKET=$(echo "$PR_BODY" | grep -oP '\[JIRA ticket\]\(\K[A-Z]+-[0-9]+' || true)
+          # Use a quoted Heredoc to prevent Bash from executing contents of the PR body
+          read -r -d '' PR_BODY <<'EOF'
+          ${{ github.event.pull_request.body }}
+          EOF
+          
+          # 1. Extract the ticket
+          TICKET=$(echo "$PR_BODY" | grep -oP '\[JIRA ticket\]\(\K[A-Z0-9]+-[0-9]+' || true)
           
           if [[ -z "$TICKET" ]]; then
-            echo "::error::No Jira ticket found in the expected format: [JIRA ticket](PROJECT-123)"
+            echo "::error::No Jira ticket found in the format: [JIRA ticket](PROJECT-123)"
             exit 1
           fi
           
-          # 2. Check if the title already has the ticket to prevent infinite loops
+          # 2. Rename if necessary
           if [[ "$PR_TITLE" != *"$TICKET"* ]]; then
-            # This sed command captures:
-            # \1: type (feat/fix/etc)
-            # \2: scope (webspark)
-            # \3: the rest of the original subject
-            # It replaces it with: type(webspark): [TICKET] subject
-            NEW_TITLE=$(echo "$PR_TITLE" | sed -E "s/^([a-z]+)\((webspark)\): (.+)$/\1(\2): [$TICKET] \3/")
+            # Note: Changed [a-z]+ to [a-zA-Z]+ to be safer with casing
+            NEW_TITLE=$(echo "$PR_TITLE" | sed -E "s/^([a-zA-Z]+)\((webspark)\): (.+)$/\1(\2): [$TICKET] \3/")
           
             echo "Renaming PR to: $NEW_TITLE"
             gh pr edit ${{ github.event.pull_request.number }} --title "$NEW_TITLE"
