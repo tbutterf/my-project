@@ -1,0 +1,16 @@
+name: 'Conventional Commit PR'
+
+on:
+  pull_request:
+    # Sync on pushes to the main branch.
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  conventional-commit-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conventional Commit In Pull Requests
+        id: pr-conventional-commits
+        uses: ytanikin/pr-conventional-commits@1.5.1
