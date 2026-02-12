@@ -16,7 +16,8 @@ jobs:
   conventional-commit-pr:
     runs-on: ubuntu-slim
     permissions:
-      pull-requests: read
+      pull_request: write
+      contents: read
     steps:
       - name: Conventional Commit In Pull Requests
         uses: amannn/action-semantic-pull-request@v6
