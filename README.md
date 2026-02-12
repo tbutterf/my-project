@@ -19,3 +19,4 @@ See: https://www.drupal.org/node/895232 for further information.
 
 ## Configuration
 - No special configuration is needed for this module. Its functionality is automatically enabled and run on module installation.
+- blah blah
