@@ -46,9 +46,8 @@ jobs:
         with:
           header: pr-title-lint-error
           message: |
-            Hey there and thank you for opening this pull request! 👋🏼
-            
-            We require pull request titles to follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/). 
+            ⚠️ Warning ⚠️
+            We require pull request titles to follow a subset of the [Conventional Commits specification](https://www.bavaga.com/blog/2025/01/27/my-ultimate-conventional-commit-types-cheatsheet/). 
             It looks like your proposed title needs to be adjusted.
             
             Details:
