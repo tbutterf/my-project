@@ -74,7 +74,7 @@ jobs:
             ```
 
       - name: Inject Jira Ticket into PR Title
-        if: always() && steps.pr-conventional-commits.outputs.scope == 'webspark'
+        if: success() && steps.pr-conventional-commits.outputs.scope == 'webspark'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -106,3 +106,75 @@ jobs:
         with:
           header: pr-title-lint-error
           delete: true
+
+      - name: Sync Conventional Labels
+        if: github.event_action != 'closed' && steps.pr-conventional-commits.outputs.type != ''
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const type = '${{ steps.pr-conventional-commits.outputs.type }}';
+            const isBreaking = '${{ steps.pr-conventional-commits.outputs.isBreakingChange }}' === 'true';
+            
+            const typeMapping = {
+              'feat': { name: 'feature', color: '0E8A16' },       // Green
+              'fix': { name: 'bug', color: 'D93F0B' },            // Red
+              'chore': { name: 'maintenance', color: 'FBCA04' },  // Yellow
+              'a11y': { name: 'accessibility', color: '0075CA' }  // Blue
+            };
+            const breakingLabelName = 'breaking-change';
+            
+            // 1. Get all existing labels in the repo
+            const repoLabels = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            const existingLabelNames = repoLabels.data.map(l => l.name);
+            
+            // 2. Helper to create label if it doesn't exist
+            async function ensureLabelExists(name, color) {
+              if (!existingLabelNames.includes(name)) {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: name,
+                  color: color
+                });
+              }
+            }
+            
+            // 3. Ensure our target labels exist
+            if (typeMapping[type]) await ensureLabelExists(typeMapping[type].name, typeMapping[type].color);
+            await ensureLabelExists(breakingLabelName, 'D73A4A');
+            
+            // 4. Update Labels on PR
+            const currentLabels = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            const currentLabelNames = currentLabels.data.map(l => l.name);
+            
+            let labelsToSet = [...currentLabelNames];
+            
+            // Add new type label, remove old type labels if they changed
+            Object.values(typeMapping).forEach(config => {
+              if (config.name === typeMapping[type]?.name) {
+                if (!labelsToSet.includes(config.name)) labelsToSet.push(config.name);
+              } else {
+                labelsToSet = labelsToSet.filter(l => l !== config.name);
+              }
+            });
+            
+            // Handle breaking-change toggle
+            if (isBreaking) {
+              if (!labelsToSet.includes(breakingLabelName)) labelsToSet.push(breakingLabelName);
+            } else {
+              labelsToSet = labelsToSet.filter(l => l !== breakingLabelName);
+            }
+            
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: labelsToSet
+            });
