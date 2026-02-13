@@ -58,8 +58,9 @@ jobs:
             ```
             We use 3 types: `fix`, `feat`, and `chore`. We also require a scope, which can be either `webspark` or `partner`.
             It looks like your proposed title needs to be adjusted.
+            
             Details:
-            ${{ steps.pr-conventional-commits.outputs.error_message }}
+            ```${{ steps.pr-conventional-commits.outputs.error_message }}```
 
       - name: Inject Jira Ticket into PR Title
         if: always() && steps.pr-conventional-commits.outputs.scope == 'webspark'
