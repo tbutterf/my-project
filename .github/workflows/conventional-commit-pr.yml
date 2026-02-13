@@ -100,7 +100,7 @@ jobs:
           fi
 
       - name: Delete resolved PR title lint error comment
-        if: always() && steps.pr-conventional-commits.outputs.error_message == null
+        if: always() && steps.pr-conventional-commits.outputs.error_message == ''
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: pr-title-lint-error
