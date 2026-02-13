@@ -1,6 +1,6 @@
 ### Description
 
-<!-- Please describe the solution this merge request provides. -->
+<!-- Please describe the solution this pull request provides. -->
 
 ### Links
 
@@ -8,7 +8,7 @@
 
 ### QA Steps
 
-<!-- Please provide adequate steps to verify this merge request. -->
+<!-- Please provide adequate steps to verify this pull request. -->
 
 ### Checklist
 
@@ -16,10 +16,10 @@
 - [ ] Design matches [Web Standards](https://xd.adobe.com/view/56f6cb78-9af5-4b12-b4ce-ef319f71113f-03a5)
 - [ ] Solution is documented on Jira ticket
 - [ ] QA steps to verify is documented on Jira ticket
-- [ ] This merge request does not introduce new PHP errors
-- [ ] This merge request does not introduce new JS errors
-- [ ] This merge request does not introduce new A11y violations
-- [ ] This merge request includes relevant documentation
+- [ ] This pull request does not introduce new PHP errors
+- [ ] This pull request does not introduce new JS errors
+- [ ] This pull request does not introduce new A11y violations
+- [ ] This pull request includes relevant documentation
 - [ ] Included .yaml files have a matching update hook
 
 ### Verified in browsers
