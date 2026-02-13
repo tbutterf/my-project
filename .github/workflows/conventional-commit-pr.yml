@@ -60,11 +60,9 @@ jobs:
             It looks like your proposed title needs to be adjusted.
             
             Details:
-            <div>
-              <pre style="white-space: pre-wrap;">
-                ${{ steps.pr-conventional-commits.outputs.error_message }}
-              </pre>
-            </div>
+            ```
+            ${{ steps.pr-conventional-commits.outputs.error_message }}
+            ```
 
       - name: Inject Jira Ticket into PR Title
         if: always() && steps.pr-conventional-commits.outputs.scope == 'webspark'
