@@ -124,9 +124,9 @@ jobs:
             console.log('Is Breaking:', isBreaking);
             
             const typeMapping = {
-              'feat': { name: 'feature', color: '0E8A16' },       // Green
-              'fix': { name: 'fix', color: 'D93F0B' },            // Red
-              'chore': { name: 'chore', color: 'FBCA04' },  // Yellow
+              'feat': { name: 'feature', color: '0E8A16' },  // Green
+              'fix': { name: 'bug fix', color: 'd876e3' },  // Pink
+              'chore': { name: 'maintenance', color: 'FBCA04' },  // Yellow
               'a11y': { name: 'a11y', color: '0075CA' }  // Blue
             };
             const breakingLabelName = 'breaking-change';
