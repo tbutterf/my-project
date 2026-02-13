@@ -48,18 +48,25 @@ jobs:
           message: |
             ⚠️ <strong>Warning</strong> ⚠️
             We require pull request titles to follow a customized subset of the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/#summary). 
+            
             Example:
             ```
               feat(webspark): [JIRA-1234] Add Button component
               ^       ^       ^
-              |       |       |__ Subject with Jira ticket number (required if scope is `webspark`)
+              |       |       |__ Subject with Jira ticket (required if the scope is "webspark")
               |       |_______ Scope
               |____________ Type
             ```
-            We use 3 types: `fix`, `feat`, and `chore`. We also require a scope, which can be either `webspark` or `partner`.
-            It looks like your proposed title needs to be adjusted.
+            We use 3 `types`:
+              - <strong>fix:</strong> a commit of the type fix patches a bug in your codebase.
+              - <strong>feat:</strong> a commit of the type feat introduces a new feature to the codebase.
+              - <strong>chore:</strong> a commit of the type chore is used for anything else, such as updating documentation, refactoring code, or performing other maintenance tasks.
             
-            <strong>Details:</strong>
+            We also <strong>require</strong> a `scope`, which relates to who is pushing the change.
+              - <strong>webspark:</strong> changes made by the Webspark team
+              - <strong>partner:</strong> changes made by Trusted Partners
+            
+            Please adjust your PR title as recommended below:
             ```
             ${{ steps.pr-conventional-commits.outputs.error_message }}
             ```
