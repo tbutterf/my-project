@@ -29,6 +29,7 @@ jobs:
           # Configure which types are allowed (newline-delimited).
           # These are regex patterns auto-wrapped in `^ $`.
           types: |
+            a11y
             fix
             feat
             chore
@@ -57,7 +58,8 @@ jobs:
               |       |_______ Scope
               |____________ Type
             ```
-            We use 3 `types`:
+            We use 4 `types`:
+              - <strong>a11y:</strong> a commit of the type a11y includes fixes that improve accessibility.
               - <strong>fix:</strong> a commit of the type fix patches a bug in your codebase.
               - <strong>feat:</strong> a commit of the type feat introduces a new feature to the codebase.
               - <strong>chore:</strong> a commit of the type chore is used for anything else, such as updating documentation, refactoring code, or performing other maintenance tasks.
