@@ -19,3 +19,10 @@ See: https://www.drupal.org/node/895232 for further information.
 
 ## Configuration
 - No special configuration is needed for this module. Its functionality is automatically enabled and run on module installation.
+
+## Contributing
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+- Pull request title format (Conventional Commits)
+- Jira ticket requirements for Webspark team PRs
+- Code standards and review process
+

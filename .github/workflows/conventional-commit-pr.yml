@@ -1,0 +1,190 @@
+name: 'Conventional Commit PR'
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+    # Run for pull requests targeting the main branch.
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  conventional-commit-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v3
+      - name: Conventional Commit In Pull Requests
+        uses: amannn/action-semantic-pull-request@v6
+        id: pr-conventional-commits
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Configure which types are allowed (newline-delimited).
+          # These are regex patterns auto-wrapped in `^ $`.
+          types: |
+            a11y
+            fix
+            feat
+            chore
+          # Configure which scopes are allowed (newline-delimited).
+          # These are regex patterns auto-wrapped in `^ $`.
+          scopes: |
+            webspark
+            partner
+          # Configure that a scope must always be provided.
+          requireScope: true
+
+      - name: Comment PR title linting errors
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: always() && (steps.pr-conventional-commits.outputs.error_message != '')
+        with:
+          header: pr-title-lint-error
+          message: |
+            ⚠️ <strong>Warning</strong> ⚠️
+            We require pull request titles to follow a customized subset of the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/#summary). 
+            
+            Example:
+            ```
+              feat(webspark): [JIRA-1234] Add Button component
+              ^       ^       ^
+              |       |       |__ Subject with Jira ticket (required if the scope is "webspark")
+              |       |_______ Scope
+              |____________ Type
+            ```
+            We use 4 `types`:
+              - <strong>a11y:</strong> a commit of the type a11y includes fixes that improve accessibility.
+              - <strong>fix:</strong> a commit of the type fix patches a bug in your codebase.
+              - <strong>feat:</strong> a commit of the type feat introduces a new feature to the codebase.
+              - <strong>chore:</strong> a commit of the type chore is used for anything else, such as updating documentation, refactoring code, or performing other maintenance tasks.
+            
+            We also <strong>require</strong> a `scope`, which relates to who is pushing the change.
+              - <strong>webspark:</strong> changes made by the Webspark team
+              - <strong>partner:</strong> changes made by Trusted Partners
+            
+            Please adjust your PR title as recommended below:
+            ```
+            ${{ steps.pr-conventional-commits.outputs.error_message }}
+            ```
+
+      - name: Inject Jira Ticket into PR Title
+        if: success() && steps.pr-conventional-commits.outputs.scope == 'webspark'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # 1. Extract the ticket
+          TICKET="$(printf '%s' "$PR_BODY" | grep -oP 'https://asudev\.jira\.com/browse/\K[A-Z0-9]+-[0-9]+' || true)"
+
+          if [[ -z "$TICKET" ]]; then
+            echo "::error::No Jira ticket found in the format: https://asudev.jira.com/browse/PROJECT-123"
+            exit 1
+          else
+            NEW_TITLE="$(printf '%s' "$PR_TITLE" | sed -E "s/^([a-zA-Z]+)\((webspark)\): (.+)$/\1(\2): [$TICKET] \3/")"
+          fi
+
+          # 2. Rename if necessary
+          if [[ "$PR_TITLE" != *"$TICKET"* ]]; then
+            echo "Renaming PR to: $NEW_TITLE"
+            gh pr edit "$PR_NUMBER" --title "$NEW_TITLE"
+          else
+            echo "Ticket $TICKET is already in the title."
+          fi
+
+      - name: Delete resolved PR title lint error comment
+        if: always() && steps.pr-conventional-commits.outputs.error_message == ''
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: pr-title-lint-error
+          delete: true
+
+      - name: Sync Conventional Labels
+        if: github.event_action != 'closed' && steps.pr-conventional-commits.outputs.type != ''
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const type = '${{ steps.pr-conventional-commits.outputs.type }}';
+            const prTitle = '${{ github.event.pull_request.title }}';
+            
+            // Detect breaking change by looking for ! before the colon
+            // Pattern: type(scope)!: description
+            const isBreaking = /^[a-z]+\([a-z]+\)!:/.test(prTitle);
+            
+            console.log('Type:', type);
+            console.log('PR Title:', prTitle);
+            console.log('Is Breaking:', isBreaking);
+            
+            const typeMapping = {
+              'feat': { name: 'feature', color: '0E8A16' },  // Green
+              'fix': { name: 'bug fix', color: 'd876e3' },  // Pink
+              'chore': { name: 'maintenance', color: 'FBCA04' },  // Yellow
+              'a11y': { name: 'a11y', color: '0075CA' }  // Blue
+            };
+            const breakingLabelName = 'breaking-change';
+            
+            // 1. Get all existing labels in the repo
+            const repoLabels = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            const existingLabelNames = repoLabels.data.map(l => l.name);
+            
+            // 2. Helper to create label if it doesn't exist
+            async function ensureLabelExists(name, color) {
+              if (!existingLabelNames.includes(name)) {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: name,
+                  color: color
+                });
+              }
+            }
+            
+            // 3. Ensure our target labels exist
+            if (typeMapping[type]) await ensureLabelExists(typeMapping[type].name, typeMapping[type].color);
+            await ensureLabelExists(breakingLabelName, 'D73A4A');
+            
+            // 4. Update Labels on PR
+            const currentLabels = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            const currentLabelNames = currentLabels.data.map(l => l.name);
+            
+            let labelsToSet = [...currentLabelNames];
+            
+            // Add new type label, remove old type labels if they changed
+            Object.values(typeMapping).forEach(config => {
+              if (config.name === typeMapping[type]?.name) {
+                if (!labelsToSet.includes(config.name)) labelsToSet.push(config.name);
+              } else {
+                labelsToSet = labelsToSet.filter(l => l !== config.name);
+              }
+            });
+            
+            // Handle breaking-change toggle
+            if (isBreaking) {
+              if (!labelsToSet.includes(breakingLabelName)) labelsToSet.push(breakingLabelName);
+            } else {
+              labelsToSet = labelsToSet.filter(l => l !== breakingLabelName);
+            }
+            
+            console.log('Final labels:', labelsToSet);
+            
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: labelsToSet
+            });
