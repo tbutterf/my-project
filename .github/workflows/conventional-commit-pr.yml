@@ -47,12 +47,12 @@ jobs:
           header: pr-title-lint-error
           message: |
             ⚠️ <strong>Warning</strong> ⚠️
-            We require pull request titles to follow a subset of the [Conventional Commits specification](https://www.bavaga.com/blog/2025/01/27/my-ultimate-conventional-commit-types-cheatsheet/). 
+            We require pull request titles to follow a customized subset of the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/#summary). 
             Example:
             ```
-              feat(partner): [JIRA-1234] Add Button component
-              ^       ^      ^
-              |       |      |__ Subject with Jira ticket (required if scope is `webspark`)
+              feat(webspark): [JIRA-1234] Add Button component
+              ^       ^       ^
+              |       |       |__ Subject with Jira ticket number (required if scope is `webspark`)
               |       |_______ Scope
               |____________ Type
             ```
