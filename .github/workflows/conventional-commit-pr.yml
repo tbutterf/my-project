@@ -40,6 +40,8 @@ jobs:
             partner
           # Configure that a scope must always be provided.
           requireScope: true
+          # Enable breaking change detection (! before the colon)
+          requireEachCommitToBeValid: true
 
       - name: Comment PR title linting errors
         uses: marocchino/sticky-pull-request-comment@v2
@@ -113,7 +115,12 @@ jobs:
         with:
           script: |
             const type = '${{ steps.pr-conventional-commits.outputs.type }}';
-            const isBreaking = '${{ steps.pr-conventional-commits.outputs.isBreakingChange }}' === 'true';
+            const isBreakingOutput = '${{ steps.pr-conventional-commits.outputs.isBreakingChange }}';
+            const isBreaking = isBreakingOutput === 'true';
+            
+            console.log('Type:', type);
+            console.log('Breaking Change Output:', isBreakingOutput);
+            console.log('Is Breaking:', isBreaking);
             
             const typeMapping = {
               'feat': { name: 'feature', color: '0E8A16' },       // Green
@@ -171,6 +178,8 @@ jobs:
             } else {
               labelsToSet = labelsToSet.filter(l => l !== breakingLabelName);
             }
+            
+            console.log('Final labels:', labelsToSet);
             
             await github.rest.issues.setLabels({
               owner: context.repo.owner,
