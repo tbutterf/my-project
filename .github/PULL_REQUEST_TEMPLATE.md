@@ -31,11 +31,7 @@ will automatically inject the ticket ID into your title.
 ### Links
 
 **Jira Ticket** (required for commits with scope `webspark`)
-
-<!-- 
-Paste the full Jira URL here. The workflow will automatically extract and inject the ticket ID into your PR title.
-Example: https://asudev.jira.com/browse/WS-1234
--->
+<!-- Paste the full Jira ticket URL below. The workflow will automatically extract and inject the ticket ID into your PR title. -->
 
 ### QA Steps
 
