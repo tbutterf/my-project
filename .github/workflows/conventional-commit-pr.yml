@@ -46,7 +46,7 @@ jobs:
         with:
           header: pr-title-lint-error
           message: |
-            ⚠️ Warning ⚠️
+            ⚠️ <strong>Warning</strong> ⚠️
             We require pull request titles to follow a subset of the [Conventional Commits specification](https://www.bavaga.com/blog/2025/01/27/my-ultimate-conventional-commit-types-cheatsheet/). 
             Example:
             ```
@@ -59,7 +59,7 @@ jobs:
             We use 3 types: `fix`, `feat`, and `chore`. We also require a scope, which can be either `webspark` or `partner`.
             It looks like your proposed title needs to be adjusted.
             
-            Details:
+            <strong>Details:</strong>
             ```
             ${{ steps.pr-conventional-commits.outputs.error_message }}
             ```
