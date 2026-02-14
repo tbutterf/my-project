@@ -81,11 +81,7 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          echo "=== Debug: Inject Jira Ticket ==="
-          echo "PR_TITLE: $PR_TITLE"
-          echo ""
-          
+        run: |         
           # 1. Extract the ticket
           TICKET="$(printf '%s' "$PR_BODY" | grep -oP 'https://asudev\.jira\.com/browse/\K[A-Z0-9]+-[0-9]+' || true)"
           echo "TICKET extracted: '$TICKET'"
@@ -102,9 +98,6 @@ jobs:
           fi
           
           # 3. Build the new title by inserting ticket after the scope
-          # Original: a11y(webspark): poopypants
-          # Result: a11y(webspark): [PROJECT-1234] poopypants
-          # Note: type can contain numbers (e.g., a11y), so use [a-z0-9]+ instead of [a-z]+
           echo "Testing sed pattern..."
           NEW_TITLE="$(printf '%s' "$PR_TITLE" | sed -E "s/^([a-z0-9]+)\(([a-z]+)\): (.*)$/\1(\2): [$TICKET] \3/")"
           echo "Sed pattern result: '$NEW_TITLE'"
@@ -121,13 +114,10 @@ jobs:
           # 4. Only update if the title actually changed
           if [[ "$NEW_TITLE" != "$PR_TITLE" ]]; then
             echo "Title changed, updating PR..."
-            echo "Old: $PR_TITLE"
-            echo "New: $NEW_TITLE"
             gh pr edit "$PR_NUMBER" --title "$NEW_TITLE"
             echo "PR title updated successfully"
           else
             echo "Sed pattern did not match the title format. No changes made."
-            echo "Expected format: type(scope): description"
           fi
 
       - name: Delete resolved PR title lint error comment
