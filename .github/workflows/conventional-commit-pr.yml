@@ -88,10 +88,10 @@ jobs:
           if [[ -z "$TICKET" ]]; then
             echo "::error::No Jira ticket found in the format: https://asudev.jira.com/browse/PROJECT-123"
             exit 1
-          else
-            NEW_TITLE="$(printf '%s' "$PR_TITLE" | sed -E "s/^([a-zA-Z]+)\((webspark)\): (.+)$/\1(\2): [$TICKET] \3/")"
           fi
-          echo "New title will be: $NEW_TITLE"
+          
+          # 2. Build the new title with the ticket
+          NEW_TITLE="$(printf '%s' "$PR_TITLE" | sed -E "s/^([a-zA-Z]+)\((webspark)\): (.+)$/\1(\2): [$TICKET] \3/")"
 
           # 2. Rename if necessary
           if [[ "$PR_TITLE" != *"$TICKET"* ]]; then
