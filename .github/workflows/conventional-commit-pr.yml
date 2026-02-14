@@ -43,7 +43,7 @@ jobs:
 
       - name: Comment PR title linting errors
         uses: marocchino/sticky-pull-request-comment@v2
-        if: always() && (steps.pr-conventional-commits.outputs.error_message != '')
+        if: always() && (steps.pr-conventional-commits.outputs.error_message != null)
         with:
           header: pr-title-lint-error
           message: |
@@ -74,7 +74,7 @@ jobs:
             ```
 
       - name: Inject Jira Ticket into PR Title
-        if: success() && steps.pr-conventional-commits.outputs.scope == 'webspark'
+        if: always() && steps.pr-conventional-commits.outputs.scope == 'webspark'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -83,7 +83,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           # 1. Extract the ticket
-          TICKET="$(printf '%s' "$PR_BODY" | grep -oP 'https://asudev\.jira\.com/browse/\K[A-Z0-9]+-[0-9]+' || true)"
+          TICKET="$(printf '%s' "$PR_BODY" | grep -oP 'https://asudev\.jira\.com/browse/\K[A-Z0-9]+-[0-9]+' || false)"
 
           if [[ -z "$TICKET" ]]; then
             echo "::error::No Jira ticket found in the format: https://asudev.jira.com/browse/PROJECT-123"
@@ -101,7 +101,7 @@ jobs:
           fi
 
       - name: Delete resolved PR title lint error comment
-        if: always() && steps.pr-conventional-commits.outputs.error_message == ''
+        if: always() && steps.pr-conventional-commits.outputs.error_message == null
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: pr-title-lint-error
