@@ -18,7 +18,7 @@ Install as you would normally install a contributed Drupal module.
 See: https://www.drupal.org/node/895232 for further information.
 
 ## Configuration
-- No special configuration is needed for this module. Its functionality is automatically enabled and run on module installation.
+- No special configuration is needed for this module. Its functionality is automatically enabled and run on module installation
 
 ## Contributing
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
