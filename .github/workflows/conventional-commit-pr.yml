@@ -43,7 +43,7 @@ jobs:
 
       - name: Comment PR title linting errors
         uses: marocchino/sticky-pull-request-comment@v2
-        if: always() && (steps.pr-conventional-commits.outputs.error_message != '')
+        if: always() && (steps.pr-conventional-commits.outputs.error_message != null)
         with:
           header: pr-title-lint-error
           message: |
@@ -74,34 +74,54 @@ jobs:
             ```
 
       - name: Inject Jira Ticket into PR Title
-        if: success() && steps.pr-conventional-commits.outputs.scope == 'webspark'
+        if: always() && steps.pr-conventional-commits.outputs.scope == 'webspark'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
+        run: |         
           # 1. Extract the ticket
           TICKET="$(printf '%s' "$PR_BODY" | grep -oP 'https://asudev\.jira\.com/browse/\K[A-Z0-9]+-[0-9]+' || true)"
+          echo "TICKET extracted: '$TICKET'"
 
           if [[ -z "$TICKET" ]]; then
             echo "::error::No Jira ticket found in the format: https://asudev.jira.com/browse/PROJECT-123"
             exit 1
-          else
-            NEW_TITLE="$(printf '%s' "$PR_TITLE" | sed -E "s/^([a-zA-Z]+)\((webspark)\): (.+)$/\1(\2): [$TICKET] \3/")"
           fi
-
-          # 2. Rename if necessary
-          if [[ "$PR_TITLE" != *"$TICKET"* ]]; then
-            echo "Renaming PR to: $NEW_TITLE"
-            gh pr edit "$PR_NUMBER" --title "$NEW_TITLE"
+          
+          # 2. Check if ticket is already in title
+          if [[ "$PR_TITLE" == *"$TICKET"* ]]; then
+            echo "Ticket $TICKET is already in the title. Exiting."
+            exit 0
+          fi
+          
+          # 3. Build the new title by inserting ticket after the scope
+          echo "Testing sed pattern..."
+          NEW_TITLE="$(printf '%s' "$PR_TITLE" | sed -E "s/^([a-z0-9]+)\(([a-z]+)\): (.*)$/\1(\2): [$TICKET] \3/")"
+          echo "Sed pattern result: '$NEW_TITLE'"
+          
+          # Debug: Test if the pattern matches
+          if printf '%s' "$PR_TITLE" | grep -qE "^[a-z0-9]+\([a-z]+\): "; then
+            echo "✓ Pattern matches!"
           else
-            echo "Ticket $TICKET is already in the title."
+            echo "✗ Pattern does NOT match"
+            echo "  Expected format: type(scope): description"
+            echo "  Got: $PR_TITLE"
+          fi
+          
+          # 4. Only update if the title actually changed
+          if [[ "$NEW_TITLE" != "$PR_TITLE" ]]; then
+            echo "Title changed, updating PR..."
+            gh pr edit "$PR_NUMBER" --title "$NEW_TITLE"
+            echo "PR title updated successfully"
+          else
+            echo "Sed pattern did not match the title format. No changes made."
           fi
 
       - name: Delete resolved PR title lint error comment
-        if: always() && steps.pr-conventional-commits.outputs.error_message == ''
+        if: always() && steps.pr-conventional-commits.outputs.error_message == null
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: pr-title-lint-error
