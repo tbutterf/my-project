@@ -1,4 +1,4 @@
-# ASU Secure Superadminaaaa
+# ASU Secure Superadmin
 
 ## Introduction
 The asu_secure_superadmin module is intended to provide Enterprise Technology with a tool to secure the user1 account in Drupal sites on the Acquia platform.
