@@ -1,0 +1,28 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+    authors:
+      - octocat
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking-change
+    - title: Feature Development
+      labels:
+        - feature
+    - title: Bug Fixes
+      labels:
+        - bug fix
+    - title: Trusted Partner changes
+      labels:
+        - trusted-partner
+    - title: Webspark changes
+      labels:
+        - webspark
+    - title: Accessibility Changes
+      labels:
+        - a11y
+    - title: Other Changes
+      labels:
+        - maintenance

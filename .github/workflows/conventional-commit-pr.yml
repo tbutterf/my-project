@@ -134,6 +134,7 @@ jobs:
           script: |
             const type = '${{ steps.pr-conventional-commits.outputs.type }}';
             const prTitle = '${{ github.event.pull_request.title }}';
+            const scope = '${{ steps.pr-conventional-commits.outputs.scope }}';
             
             // Detect breaking change by looking for ! before the colon
             // Pattern: type(scope)!: description
@@ -148,6 +149,10 @@ jobs:
               'fix': { name: 'bug fix', color: 'd876e3' },  // Pink
               'chore': { name: 'maintenance', color: 'FBCA04' },  // Yellow
               'a11y': { name: 'a11y', color: '0075CA' }  // Blue
+            };
+            const scopeMapping = {
+              'webspark': { name: 'webspark', color: '8C1D40' },  // Maroon
+              'partner': { name: 'trusted-partner', color: 'FF7F32' }  // Orange
             };
             const breakingLabelName = 'breaking-change';
             
@@ -172,6 +177,7 @@ jobs:
             
             // 3. Ensure our target labels exist
             if (typeMapping[type]) await ensureLabelExists(typeMapping[type].name, typeMapping[type].color);
+            if (scopeMapping[scope]) await ensureLabelExists(scopeMapping[scope].name, scopeMapping[scope].color);
             await ensureLabelExists(breakingLabelName, 'D73A4A');
             
             // 4. Update Labels on PR
@@ -187,6 +193,15 @@ jobs:
             // Add new type label, remove old type labels if they changed
             Object.values(typeMapping).forEach(config => {
               if (config.name === typeMapping[type]?.name) {
+                if (!labelsToSet.includes(config.name)) labelsToSet.push(config.name);
+              } else {
+                labelsToSet = labelsToSet.filter(l => l !== config.name);
+              }
+            });
+            
+            // Add scope label, remove old scope labels if they changed
+            Object.values(scopeMapping).forEach(config => {
+              if (config.name === scopeMapping[scope]?.name) {
                 if (!labelsToSet.includes(config.name)) labelsToSet.push(config.name);
               } else {
                 labelsToSet = labelsToSet.filter(l => l !== config.name);
