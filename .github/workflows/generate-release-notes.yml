@@ -127,48 +127,78 @@ jobs:
             
             if (previousTag && currentTag) {
               try {
-                // Get commits between the two tags
+                // Get the commit SHAs for both tags
+                const currentTagRef = await github.rest.git.getRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${currentTag}`,
+                });
+                
+                const previousTagRef = await github.rest.git.getRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${previousTag}`,
+                });
+                
+                const currentSha = currentTagRef.data.object.sha;
+                const previousSha = previousTagRef.data.object.sha;
+                
+                console.log(`Comparing commits: ${previousTag} (${previousSha}) -> ${currentTag} (${currentSha})`);
+                
+                // Get commits between the two SHAs
                 const compareResult = await github.rest.repos.compareCommits({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  base: previousTag,
-                  head: currentTag,
+                  base: previousSha,
+                  head: currentSha,
                 });
                 
                 const commits = compareResult.data.commits || [];
-                console.log(`Found ${commits.length} commits between ${previousTag} and ${currentTag}`);
+                console.log(`Found ${commits.length} commits between tags`);
                 
-                // Extract PR numbers from commit messages and PR associations
-                const prNumbers = new Set();
+                // Get all PRs and filter to only those merged between these commits
+                let page = 1;
+                let hasMore = true;
+                const prMap = new Map(); // Use map to deduplicate by PR number
                 
-                // Get PRs associated with these commits
-                for (const commit of commits) {
-                  // Try to find PR associated with this commit
-                  const prMatch = commit.message.match(/#(\d+)/);
-                  if (prMatch) {
-                    prNumbers.add(parseInt(prMatch[1]));
-                  }
-                }
-                
-                console.log(`Found ${prNumbers.size} unique PR numbers from commit messages`);
-                
-                // Fetch full PR details for all found PRs
-                for (const prNumber of prNumbers) {
-                  try {
-                    const pr = await github.rest.pulls.get({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      pull_number: prNumber,
-                    });
-                    
+                while (hasMore && page <= 10) {
+                  const prsResult = await github.rest.pulls.list({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    state: 'closed',
+                    sort: 'updated',
+                    direction: 'desc',
+                    per_page: 100,
+                    page: page,
+                  });
+                  
+                  const prs = prsResult.data || [];
+                  
+                  for (const pr of prs) {
                     // Only include merged PRs
-                    if (pr.data.merged_at) {
-                      allPRs.push(pr.data);
+                    if (!pr.merged_at) {
+                      continue;
                     }
-                  } catch (error) {
-                    console.warn(`Failed to fetch PR #${prNumber}:`, error.message);
+                    
+                    // Check if this PR's merge commit is in the range between previousSha and currentSha
+                    if (pr.merge_commit_sha) {
+                      // Check if merge commit is in the commits between the two refs
+                      const isInRange = commits.some(c => c.sha === pr.merge_commit_sha);
+                      
+                      if (isInRange && !prMap.has(pr.number)) {
+                        prMap.set(pr.number, pr);
+                        console.log(`Found PR #${pr.number} in commit range`);
+                      }
+                    }
                   }
+                  
+                  // Stop if we got less than 100 results or haven't found new PRs
+                  hasMore = prs.length === 100;
+                  page++;
                 }
+                
+                allPRs = Array.from(prMap.values());
+                console.log(`Total PRs found in commit range: ${allPRs.length}`);
                 
               } catch (error) {
                 console.error('Failed to compare commits:', error.message);
