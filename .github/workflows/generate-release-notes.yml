@@ -381,7 +381,7 @@ jobs:
             // Add full changelog link at the end if we have a previous release
             if (previousTag && currentTag) {
               const compareUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${previousTag}...${currentTag}`;
-              releaseNotes += `\n**Full Changelog**: [${previousTag}...${currentTag}](${compareUrl})\n`;
+              releaseNotes += `\n**Full Changelog**: [${previousTag}...${currentTag}](`${compareUrl}`)\n`;
             }
 
             // Update release body
