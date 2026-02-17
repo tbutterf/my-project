@@ -1,29 +1,3 @@
-<!-- 
-IMPORTANT: PR Title Requirements
-
-Your PR title MUST follow the Conventional Commits format:
-
-  <type>(<scope>): <description>
-
-Types (choose one):
-  - a11y: Accessibility improvements
-  - fix: Bug fixes
-  - feat: New features
-  - chore: Maintenance, documentation, or refactoring
-
-Scopes (choose one):
-  - webspark: Changes by the Webspark team (requires Jira ticket below)
-  - partner: Changes by Trusted Partners
-
-Examples:
-  feat(webspark): Add new button component
-  fix(partner): Resolve navigation issue
-  a11y(webspark): Improve form labels
-
-Note: For webspark scope, include the Jira URL below and the workflow 
-will automatically inject the ticket ID into your title.
--->
-
 ### Description
 
 <!-- Please describe the solution this pull request provides. -->
