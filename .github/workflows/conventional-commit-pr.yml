@@ -42,6 +42,7 @@ jobs:
           requireScope: true
 
       - name: Inject Jira Ticket into PR Title
+        id: jira-validation
         if: always() && steps.pr-conventional-commits.outputs.scope == 'webspark'
         shell: bash
         env:
@@ -55,8 +56,8 @@ jobs:
           echo "TICKET extracted: '$TICKET'"
 
           if [[ -z "$TICKET" ]]; then
-            echo "::error::No Jira ticket found in the format: https://asudev.jira.com/browse/PROJECT-123"
-            exit 1
+            echo "error_message=No Jira ticket found in the format: https://asudev.jira.com/browse/PROJECT-123" >> $GITHUB_OUTPUT
+            exit 0
           fi
           
           # 2. Check if ticket is already in title
@@ -90,7 +91,7 @@ jobs:
 
       - name: Comment PR title linting errors
         uses: marocchino/sticky-pull-request-comment@v2
-        if: always() && (steps.pr-conventional-commits.outputs.error_message != null)
+        if: always() && (steps.pr-conventional-commits.outputs.error_message != null || steps.jira-validation.outputs.error_message != null)
         with:
           header: pr-title-lint-error
           message: |
@@ -117,11 +118,11 @@ jobs:
 
             Please adjust your PR title as recommended below:
             ```
-            ${{ steps.pr-conventional-commits.outputs.error_message }}
+            ${{ steps.pr-conventional-commits.outputs.error_message }}${{ steps.jira-validation.outputs.error_message }}
             ```
 
       - name: Delete resolved PR title lint error comment
-        if: always() && steps.pr-conventional-commits.outputs.error_message == null
+        if: always() && steps.pr-conventional-commits.outputs.error_message == null && steps.jira-validation.outputs.error_message == null
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: pr-title-lint-error
