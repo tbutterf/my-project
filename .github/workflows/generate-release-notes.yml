@@ -30,35 +30,79 @@ jobs:
               let currentCategory = null;
               let inLabels = false;
 
-              for (const line of lines) {
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
                 const trimmed = line.trim();
                 
+                // Skip empty lines and comments
+                if (!trimmed || trimmed.startsWith('#')) {
+                  continue;
+                }
+                
                 if (trimmed.startsWith('- title:')) {
-                  if (currentCategory) categories.push(currentCategory);
+                  if (currentCategory && currentCategory.labels.length > 0) {
+                    categories.push(currentCategory);
+                  } else if (currentCategory) {
+                    console.warn(`Category "${currentCategory.title}" has no labels defined`);
+                    categories.push(currentCategory);
+                  }
+                  
+                  const titleMatch = trimmed.match(/- title:\s*['"]?([^'"]+)['"]?/);
+                  if (!titleMatch) {
+                    throw new Error(`Invalid title format on line ${i + 1}: ${trimmed}`);
+                  }
+                  
                   currentCategory = { 
-                    title: trimmed.replace('- title:', '').trim().replace(/^["']|["']$/g, ''),
+                    title: titleMatch[1].trim(),
                     labels: []
                   };
                   inLabels = false;
                 } else if (currentCategory && trimmed === 'labels:') {
                   inLabels = true;
                 } else if (inLabels && trimmed.startsWith('- ')) {
-                  const label = trimmed.substring(2).trim().replace(/^["']|["']$/g, '');
-                  if (label && label !== 'labels:') {
-                    currentCategory.labels.push(label);
+                  const labelMatch = trimmed.match(/- ['"]?([^'"]+)['"]?/);
+                  if (labelMatch) {
+                    const label = labelMatch[1].trim();
+                    if (label && label !== 'labels:') {
+                      currentCategory.labels.push(label);
+                    }
                   }
-                } else if (inLabels && !trimmed.startsWith('-') && trimmed) {
+                } else if (inLabels && !trimmed.startsWith('-') && trimmed && !trimmed.startsWith('#')) {
                   inLabels = false;
                 }
               }
               
-              if (currentCategory) categories.push(currentCategory);
+              // Push the last category if it has labels
+              if (currentCategory && currentCategory.labels.length > 0) {
+                categories.push(currentCategory);
+              } else if (currentCategory) {
+                console.warn(`Category "${currentCategory.title}" has no labels defined`);
+                categories.push(currentCategory);
+              }
+              
+              if (categories.length === 0) {
+                throw new Error('No valid categories found in release.yml');
+              }
+              
               return { changelog: { categories, exclude: { labels: ['ignore-for-release'] } } };
             }
 
-            // Load release.yml configuration
-            const configContent = fs.readFileSync('.github/release.yml', 'utf8');
-            const releaseConfig = parseReleaseConfig(configContent);
+            // Load release.yml configuration with error handling
+            let releaseConfig;
+            try {
+              if (!fs.existsSync('.github/release.yml')) {
+                throw new Error('.github/release.yml file not found');
+              }
+              const configContent = fs.readFileSync('.github/release.yml', 'utf8');
+              releaseConfig = parseReleaseConfig(configContent);
+              
+              if (!releaseConfig.changelog || !releaseConfig.changelog.categories || releaseConfig.changelog.categories.length === 0) {
+                throw new Error('Invalid release.yml format: no categories found');
+              }
+            } catch (error) {
+              console.error('Failed to load release configuration:', error.message);
+              throw error;
+            }
             
             // Get the current release
             const release = context.payload.release;
@@ -69,9 +113,14 @@ jobs:
               repo: context.repo.repo,
             });
             
-            const previousRelease = releases.data.find((r, i) => i > 0);
+            // Filter out the current release and get the first (most recent) previous release
+            const previousRelease = releases.data.filter(r => r.id !== release.id)[0];
             const currentReleaseDate = release.published_at.split('T')[0];
             const previousReleaseDate = previousRelease?.published_at.split('T')[0];
+            
+            if (!previousRelease) {
+              console.log('No previous release found. This is the first release.');
+            }
 
             // Build query to get merged PRs between releases
             let query = `repo:${context.repo.owner}/${context.repo.repo} is:merged`;
@@ -81,16 +130,40 @@ jobs:
 
             console.log('Search query:', query);
 
-            const searchResult = await github.rest.search.issuesAndPullRequests({
-              q: query,
-              sort: 'created',
-              order: 'desc',
-              per_page: 100,
-            });
+            // Pagination handling to retrieve all results
+            // Note: GitHub Search API has a hard limit of 1000 results total
+            let allPRs = [];
+            let page = 1;
+            let hasMore = true;
+            const MAX_RESULTS = 1000;
+            const MAX_PAGES = 10; // 10 pages * 100 per page = 1000
 
-            console.log('Search result:', JSON.stringify(searchResult.data, null, 2));
+            while (hasMore && allPRs.length < MAX_RESULTS && page <= MAX_PAGES) {
+              const searchResult = await github.rest.search.issuesAndPullRequests({
+                q: query,
+                sort: 'created',
+                order: 'desc',
+                per_page: 100,
+                page: page,
+              });
 
-            const prs = (searchResult.data?.items || []).filter(item => item.pull_request);
+              const items = searchResult.data?.items || [];
+              allPRs = allPRs.concat(items);
+              
+              console.log(`Page ${page}: Retrieved ${items.length} items. Total so far: ${allPRs.length}`);
+              
+              // Stop if we got less than per_page (no more results) or reached the limit
+              hasMore = items.length === 100 && allPRs.length < MAX_RESULTS;
+              page++;
+            }
+
+            if (allPRs.length >= MAX_RESULTS) {
+              console.warn(`Search results reached GitHub API limit of ${MAX_RESULTS} items. Some PRs may be excluded.`);
+            }
+
+            console.log(`Search completed. Total items found: ${allPRs.length}`);
+
+            const prs = allPRs.filter(item => item.pull_request);
 
             console.log(`Found ${prs.length} merged pull requests`);
 
@@ -142,7 +215,7 @@ jobs:
 
               // If no matching categories, add to "Other Changes" if it exists
               if (matchingCategories.length === 0) {
-                const otherCat = categories.find(c => c.labels.includes('maintenance'));
+                const otherCat = categories.find(c => c.title.toLowerCase() === 'other changes');
                 if (otherCat) {
                   matchingCategories.push(otherCat.title);
                 }
