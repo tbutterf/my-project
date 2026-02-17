@@ -366,14 +366,14 @@ jobs:
             });
 
             // Build release notes content
-            let releaseNotes = '';
+            let releaseNotes = `## What's Changed\n\n`;
             categories.forEach(cat => {
               const prsInCategory = categorizedPRs[cat.title];
               if (prsInCategory && prsInCategory.length > 0) {
-                releaseNotes += `## ${cat.title}\n\n`;
+                releaseNotes += `### ${cat.title}\n\n`;
                 
                 prsInCategory.forEach(pr => {
-                  releaseNotes += `- [#${pr.number}](${pr.url}): ${pr.title} (@${pr.user})\n`;
+                  releaseNotes += `- ${pr.title} by @${pr.user} in [#${pr.number}](${pr.url})\n`;
                 });
                 
                 releaseNotes += '\n';
