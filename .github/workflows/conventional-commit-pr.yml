@@ -56,8 +56,8 @@ jobs:
           echo "TICKET extracted: '$TICKET'"
 
           if [[ -z "$TICKET" ]]; then
-            echo "error_message=No Jira ticket found in the format: https://asudev.jira.com/browse/PROJECT-123" >> $GITHUB_OUTPUT
-            exit 0
+            echo "error_message=No Jira ticket found in the pull request body with the format: https://asudev.jira.com/browse/PROJECT-123" >> $GITHUB_OUTPUT
+            exit 1
           fi
           
           # 2. Check if ticket is already in title
