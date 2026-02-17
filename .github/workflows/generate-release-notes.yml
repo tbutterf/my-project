@@ -54,8 +54,12 @@ jobs:
 
             // Get merged PRs between tags
             let query = `repo:${context.repo.owner}/${context.repo.repo} is:merged`;
-            if (previousTag) {
-              query += ` merged:${previousTag}..${releaseTag}`;
+            // GitHub API call to get release published_at dates
+            const previousReleaseDate = previousRelease.published_at.split('T')[0];
+            const currentReleaseDate = release.data.published_at.split('T')[0];
+            
+            if (previousReleaseDate && currentReleaseDate) {
+              query += ` merged:${previousReleaseDate}..${currentReleaseDate}`;
             }
 
             const searchResult = await github.rest.search.issuesAndPullRequests({
