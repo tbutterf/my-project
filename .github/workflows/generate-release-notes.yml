@@ -375,10 +375,14 @@ jobs:
                 prsInCategory.forEach(pr => {
                   releaseNotes += `- ${pr.title} by @${pr.user} in [#${pr.number}](${pr.url})\n`;
                 });
-                
-                releaseNotes += '\n';
               }
             });
+
+            // Add full changelog link at the end if we have a previous release
+            if (previousTag && currentTag) {
+              const compareUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${previousTag}...${currentTag}`;
+              releaseNotes += `\n**Full Changelog**: [${previousTag}...${currentTag}](${compareUrl})\n`;
+            }
 
             // Update release body
             await github.rest.repos.updateRelease({
