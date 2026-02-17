@@ -106,8 +106,9 @@ jobs:
             
             // Get the current release
             const release = context.payload.release;
+            const currentTag = release.tag_name;
 
-            // Get previous release for date comparison
+            // Get previous release by comparing tags
             const releases = await github.rest.repos.listReleases({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -115,60 +116,161 @@ jobs:
             
             // Filter out the current release and get the first (most recent) previous release
             const previousRelease = releases.data.filter(r => r.id !== release.id)[0];
-            const currentReleaseDate = release.published_at.split('T')[0];
-            const previousReleaseDate = previousRelease?.published_at.split('T')[0];
+            const previousTag = previousRelease?.tag_name;
             
             if (!previousRelease) {
               console.log('No previous release found. This is the first release.');
             }
 
-            // Build query to get merged PRs between releases
-            let query = `repo:${context.repo.owner}/${context.repo.repo} is:merged`;
-            if (previousReleaseDate && currentReleaseDate) {
-              query += ` merged:${previousReleaseDate}..${currentReleaseDate}`;
-            }
-
-            console.log('Search query:', query);
-
-            // Pagination handling to retrieve all results
-            // Note: GitHub Search API has a hard limit of 1000 results total
+            // Use the compare commits API to get the actual commits between releases
             let allPRs = [];
-            let page = 1;
-            let hasMore = true;
-            const MAX_RESULTS = 1000;
-            const MAX_PAGES = 10; // 10 pages * 100 per page = 1000
-
-            while (hasMore && allPRs.length < MAX_RESULTS && page <= MAX_PAGES) {
-              const searchResult = await github.rest.search.issuesAndPullRequests({
-                q: query,
-                sort: 'created',
-                order: 'desc',
-                per_page: 100,
-                page: page,
-              });
-
-              const items = searchResult.data?.items || [];
-              allPRs = allPRs.concat(items);
-              
-              console.log(`Page ${page}: Retrieved ${items.length} items. Total so far: ${allPRs.length}`);
-              
-              // Stop if we got less than per_page (no more results) or reached the limit
-              hasMore = items.length === 100 && allPRs.length < MAX_RESULTS;
-              page++;
+            
+            if (previousTag && currentTag) {
+              try {
+                // Get commits between the two tags
+                const compareResult = await github.rest.repos.compareCommits({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  base: previousTag,
+                  head: currentTag,
+                });
+                
+                const commits = compareResult.data.commits || [];
+                console.log(`Found ${commits.length} commits between ${previousTag} and ${currentTag}`);
+                
+                // Extract PR numbers from commit messages and PR associations
+                const prNumbers = new Set();
+                
+                // Get PRs associated with these commits
+                for (const commit of commits) {
+                  // Try to find PR associated with this commit
+                  const prMatch = commit.message.match(/#(\d+)/);
+                  if (prMatch) {
+                    prNumbers.add(parseInt(prMatch[1]));
+                  }
+                }
+                
+                console.log(`Found ${prNumbers.size} unique PR numbers from commit messages`);
+                
+                // Fetch full PR details for all found PRs
+                for (const prNumber of prNumbers) {
+                  try {
+                    const pr = await github.rest.pulls.get({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      pull_number: prNumber,
+                    });
+                    
+                    // Only include merged PRs
+                    if (pr.data.merged_at) {
+                      allPRs.push(pr.data);
+                    }
+                  } catch (error) {
+                    console.warn(`Failed to fetch PR #${prNumber}:`, error.message);
+                  }
+                }
+                
+              } catch (error) {
+                console.error('Failed to compare commits:', error.message);
+                // Fallback to search-based approach if comparison fails
+                console.log('Falling back to search-based approach...');
+              }
             }
+            
+            // If we don't have PRs yet (either no previous release or compare failed), use search
+            if (allPRs.length === 0) {
+              console.log('Using search-based approach to find PRs...');
+              let query = `repo:${context.repo.owner}/${context.repo.repo} is:merged`;
+              
+              if (previousTag && currentTag) {
+                // For tagged releases, use the tag dates as fallback
+                try {
+                  const currentTagRef = await github.rest.git.getRef({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ref: `tags/${currentTag}`,
+                  });
+                  
+                  const previousTagRef = await github.rest.git.getRef({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ref: `tags/${previousTag}`,
+                  });
+                  
+                  const currentCommit = await github.rest.git.getCommit({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    commit_sha: currentTagRef.data.object.sha,
+                  });
+                  
+                  const previousCommit = await github.rest.git.getCommit({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    commit_sha: previousTagRef.data.object.sha,
+                  });
+                  
+                  const currentDate = currentCommit.data.committer.date.split('T')[0];
+                  const previousDate = previousCommit.data.committer.date.split('T')[0];
+                  
+                  query += ` merged:${previousDate}..${currentDate}`;
+                  console.log(`Using commit dates: ${previousDate} to ${currentDate}`);
+                } catch (error) {
+                  console.warn('Failed to get tag dates, using release dates as fallback');
+                  const currentDate = release.published_at.split('T')[0];
+                  const previousDate = previousRelease?.published_at.split('T')[0];
+                  if (previousDate && currentDate) {
+                    query += ` merged:${previousDate}..${currentDate}`;
+                  }
+                }
+              }
 
-            if (allPRs.length >= MAX_RESULTS) {
-              console.warn(`Search results reached GitHub API limit of ${MAX_RESULTS} items. Some PRs may be excluded.`);
+              console.log('Search query:', query);
+
+              // Pagination handling to retrieve all results
+              // Note: GitHub Search API has a hard limit of 1000 results total
+              let searchPRs = [];
+              let page = 1;
+              let hasMore = true;
+              const MAX_RESULTS = 1000;
+              const MAX_PAGES = 10; // 10 pages * 100 per page = 1000
+
+              while (hasMore && searchPRs.length < MAX_RESULTS && page <= MAX_PAGES) {
+                const searchResult = await github.rest.search.issuesAndPullRequests({
+                  q: query,
+                  sort: 'created',
+                  order: 'desc',
+                  per_page: 100,
+                  page: page,
+                });
+
+                const items = searchResult.data?.items || [];
+                searchPRs = searchPRs.concat(items);
+                
+                console.log(`Page ${page}: Retrieved ${items.length} items. Total so far: ${searchPRs.length}`);
+                
+                // Stop if we got less than per_page (no more results) or reached the limit
+                hasMore = items.length === 100 && searchPRs.length < MAX_RESULTS;
+                page++;
+              }
+
+              if (searchPRs.length >= MAX_RESULTS) {
+                console.warn(`Search results reached GitHub API limit of ${MAX_RESULTS} items. Some PRs may be excluded.`);
+              }
+
+              console.log(`Search completed. Total items found: ${searchPRs.length}`);
+              
+              // Convert search results to PR objects and add to allPRs
+              const searchResultPRs = searchPRs.filter(item => item.pull_request);
+              allPRs = allPRs.concat(searchResultPRs);
             }
 
             console.log(`Search completed. Total items found: ${allPRs.length}`);
 
-            const prs = allPRs.filter(item => item.pull_request);
 
-            console.log(`Found ${prs.length} merged pull requests`);
+            console.log(`Total PRs found: ${allPRs.length}`);
 
             // If no PRs found, add a note
-            if (prs.length === 0) {
+            if (allPRs.length === 0) {
               console.log('No pull requests found for this release');
               const noChangesNote = '## Changes\n\nNo pull requests were merged in this release.';
               
@@ -194,7 +296,7 @@ jobs:
             });
 
             // Process each PR
-            prs.forEach(pr => {
+            allPRs.forEach(pr => {
               const prLabels = pr.labels.map(l => l.name);
               
               // Skip if in exclude list
