@@ -79,6 +79,8 @@ jobs:
               query += ` merged:${previousReleaseDate}..${currentReleaseDate}`;
             }
 
+            console.log('Search query:', query);
+
             const searchResult = await github.rest.search.issuesAndPullRequests({
               q: query,
               sort: 'created',
@@ -86,7 +88,26 @@ jobs:
               per_page: 100,
             });
 
-            const prs = searchResult.items.filter(item => item.pull_request);
+            console.log('Search result:', JSON.stringify(searchResult.data, null, 2));
+
+            const prs = (searchResult.data?.items || []).filter(item => item.pull_request);
+
+            console.log(`Found ${prs.length} merged pull requests`);
+
+            // If no PRs found, add a note
+            if (prs.length === 0) {
+              console.log('No pull requests found for this release');
+              const noChangesNote = '## Changes\n\nNo pull requests were merged in this release.';
+              
+              await github.rest.repos.updateRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: context.payload.release.id,
+                body: noChangesNote,
+              });
+              
+              return;
+            }
 
             // Build categorized notes
             const categories = releaseConfig.changelog.categories;
