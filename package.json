@@ -1,0 +1,13 @@
+{
+  "name": "asu_secure_superadmin-release-tools",
+  "version": "1.0.0",
+  "description": "Release notes generation tools for ASU Secure Superadmin module",
+  "type": "module",
+  "scripts": {
+    "release-notes": "node scripts/generate-release-notes.js"
+  },
+  "devDependencies": {
+    "yaml": "^2.3.3"
+  }
+}
+

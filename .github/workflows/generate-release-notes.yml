@@ -1,0 +1,143 @@
+name: Generate Release Notes with Multi-Label Support
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  generate-release-notes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Generate Release Notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const yaml = require('yaml');
+
+            // Load release.yml configuration
+            const releaseConfig = yaml.parse(fs.readFileSync('.github/release.yml', 'utf8'));
+            
+            // Get the release tag
+            const releaseTag = context.ref.replace('refs/tags/', '');
+            const release = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+            });
+
+            // Get previous release tag for comparison
+            const releases = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            const previousRelease = releases.data[1]; // Get second most recent
+            const previousTag = previousRelease ? previousRelease.tag_name : '';
+
+            // Get merged PRs between tags
+            let query = `repo:${context.repo.owner}/${context.repo.repo} is:merged`;
+            if (previousTag) {
+              query += ` merged:${previousTag}..${releaseTag}`;
+            }
+
+            const searchResult = await github.rest.search.issuesAndPullRequests({
+              q: query,
+              sort: 'created',
+              order: 'desc',
+              per_page: 100,
+            });
+
+            const prs = searchResult.items.filter(item => item.pull_request);
+
+            // Build categorized notes
+            const categories = releaseConfig.changelog.categories;
+            const excludeLabels = releaseConfig.changelog.exclude.labels || [];
+            
+            const categorizedPRs = {};
+            
+            // Initialize categories
+            categories.forEach(cat => {
+              categorizedPRs[cat.title] = [];
+            });
+
+            // Process each PR
+            prs.forEach(pr => {
+              const prLabels = pr.labels.map(l => l.name);
+              
+              // Skip if in exclude list
+              if (prLabels.some(l => excludeLabels.includes(l))) {
+                return;
+              }
+
+              // Find all matching categories for this PR
+              const matchingCategories = [];
+              categories.forEach(cat => {
+                const hasMatchingLabel = cat.labels.some(catLabel =>
+                  prLabels.includes(catLabel)
+                );
+                if (hasMatchingLabel) {
+                  matchingCategories.push(cat.title);
+                }
+              });
+
+              // If no matching categories, add to "Other Changes" if it exists
+              if (matchingCategories.length === 0) {
+                const otherCat = categories.find(c => c.labels.includes('maintenance'));
+                if (otherCat) {
+                  matchingCategories.push(otherCat.title);
+                }
+              }
+
+              // Add PR to all matching categories
+              matchingCategories.forEach(catTitle => {
+                categorizedPRs[catTitle].push({
+                  number: pr.number,
+                  title: pr.title,
+                  user: pr.user.login,
+                  url: pr.html_url,
+                  labels: prLabels,
+                });
+              });
+            });
+
+            // Build release notes content
+            let releaseNotes = '';
+            categories.forEach(cat => {
+              const prsInCategory = categorizedPRs[cat.title];
+              if (prsInCategory && prsInCategory.length > 0) {
+                releaseNotes += `## ${cat.title}\n\n`;
+                
+                prsInCategory.forEach(pr => {
+                  releaseNotes += `- [#${pr.number}](${pr.url}): ${pr.title} (@${pr.user})\n`;
+                });
+                
+                releaseNotes += '\n';
+              }
+            });
+
+            // Update release body
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              body: releaseNotes.trim(),
+            });
+
+            console.log('Release notes generated successfully!');
+            console.log(releaseNotes);
+
