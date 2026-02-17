@@ -8,7 +8,7 @@ jobs:
   generate-release-notes:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: read
 
     steps:
@@ -17,47 +17,64 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install YAML package
-        run: npm install yaml
-
       - name: Generate Release Notes
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const yaml = require('yaml');
+
+            // Simple YAML parser for our specific use case
+            function parseReleaseConfig(content) {
+              const lines = content.split('\n');
+              const categories = [];
+              let currentCategory = null;
+              let inLabels = false;
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                
+                if (trimmed.startsWith('- title:')) {
+                  if (currentCategory) categories.push(currentCategory);
+                  currentCategory = { 
+                    title: trimmed.replace('- title:', '').trim().replace(/^["']|["']$/g, ''),
+                    labels: []
+                  };
+                  inLabels = false;
+                } else if (currentCategory && trimmed === 'labels:') {
+                  inLabels = true;
+                } else if (inLabels && trimmed.startsWith('- ')) {
+                  const label = trimmed.substring(2).trim().replace(/^["']|["']$/g, '');
+                  if (label && label !== 'labels:') {
+                    currentCategory.labels.push(label);
+                  }
+                } else if (inLabels && !trimmed.startsWith('-') && trimmed) {
+                  inLabels = false;
+                }
+              }
+              
+              if (currentCategory) categories.push(currentCategory);
+              return { changelog: { categories, exclude: { labels: ['ignore-for-release'] } } };
+            }
 
             // Load release.yml configuration
-            const releaseConfig = yaml.parse(fs.readFileSync('.github/release.yml', 'utf8'));
+            const configContent = fs.readFileSync('.github/release.yml', 'utf8');
+            const releaseConfig = parseReleaseConfig(configContent);
             
-            // Get the release tag
-            const releaseTag = context.ref.replace('refs/tags/', '');
-            const release = await github.rest.repos.getRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: context.payload.release.id,
-            });
+            // Get the current release
+            const release = context.payload.release;
 
-            // Get previous release tag for comparison
+            // Get previous release for date comparison
             const releases = await github.rest.repos.listReleases({
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
             
-            const previousRelease = releases.data[1]; // Get second most recent
-            const previousTag = previousRelease ? previousRelease.tag_name : '';
+            const previousRelease = releases.data.find((r, i) => i > 0);
+            const currentReleaseDate = release.published_at.split('T')[0];
+            const previousReleaseDate = previousRelease?.published_at.split('T')[0];
 
-            // Get merged PRs between tags
+            // Build query to get merged PRs between releases
             let query = `repo:${context.repo.owner}/${context.repo.repo} is:merged`;
-            // GitHub API call to get release published_at dates
-            const previousReleaseDate = previousRelease.published_at.split('T')[0];
-            const currentReleaseDate = release.data.published_at.split('T')[0];
-            
             if (previousReleaseDate && currentReleaseDate) {
               query += ` merged:${previousReleaseDate}..${currentReleaseDate}`;
             }
@@ -147,4 +164,3 @@ jobs:
 
             console.log('Release notes generated successfully!');
             console.log(releaseNotes);
-
