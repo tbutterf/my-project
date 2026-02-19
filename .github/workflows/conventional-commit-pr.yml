@@ -38,12 +38,13 @@ jobs:
           scopes: |
             webspark
             partner
+            stack
           # Configure that a scope must always be provided.
           requireScope: true
 
       - name: Inject Jira Ticket into PR Title
         id: jira-validation
-        if: always() && steps.pr-conventional-commits.outputs.scope == 'webspark'
+        if: always() && (steps.pr-conventional-commits.outputs.scope == 'webspark' || steps.pr-conventional-commits.outputs.scope == 'stack')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -102,7 +103,7 @@ jobs:
             ```
               feat(webspark): [JIRA-1234] Add Button component
               ^       ^       ^
-              |       |       |__ Subject with Jira ticket (required if the scope is "webspark")
+              |       |       |__ Subject with Jira ticket (required if the scope is "webspark" or "stack")
               |       |_______ Scope
               |____________ Type
             ```
@@ -112,9 +113,10 @@ jobs:
               - <strong>feat:</strong> a commit of the type feat introduces a new feature to the codebase.
               - <strong>chore:</strong> a commit of the type chore is used for anything else, such as updating documentation, refactoring code, or performing other maintenance tasks.
 
-            We also <strong>require</strong> a `scope`, which relates to who is pushing the change.
-              - <strong>webspark:</strong> changes made by the Webspark team
-              - <strong>partner:</strong> changes made by Trusted Partners
+            We also <strong>require</strong> a `scope`, which relates to where the change is being made.
+              - <strong>webspark:</strong> changes made on the Webspark profile and associated modules/themes/etc.
+              - <strong>partner:</strong> changes made by Trusted Partners on their custom code.
+              - <strong>stack:</strong> changes made by the ET Web Team to the shared stack codebase.
 
             Please adjust your PR title as recommended below:
             ```
@@ -153,7 +155,8 @@ jobs:
             };
             const scopeMapping = {
               'webspark': { name: 'webspark', color: '8C1D40' },  // Maroon
-              'partner': { name: 'trusted-partner', color: 'FF7F32' }  // Orange
+              'partner': { name: 'trusted-partner', color: 'FF7F32' },  // Orange
+              'stack': { name: 'stack', color: '008672' }  // Aquamarine
             };
             const breakingLabelName = 'breaking-change';
             
